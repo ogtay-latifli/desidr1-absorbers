@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>DESI DR1. C IV Absorbers</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        body { overflow: hidden; background: #000; }
+        #info {
+            position: absolute; top: 12px; left: 12px;
+            color: rgba(255,255,255,0.7);
+            font-family: monospace; font-size: 13px;
+            line-height: 1.8; pointer-events: none;
+        }
+        #legend {
+            position: absolute; bottom: 16px; right: 16px;
+            color: white; font-family: monospace; font-size: 11px;
+            line-height: 1.9;
+        }
+        .dot { display:inline-block; width:8px; height:8px;
+               border-radius:50%; margin-right:6px; }
+    </style>
+</head>
+<body>
+
+<div id="info">
+    DESI DR1 — C IV Absorbers<br>
+    <span id="count" style="color:#aaa">Loading...</span><br>
+    <span style="font-size:11px;color:#888">
+        Drag to rotate · Scroll to zoom
+    </span>
+</div>
+
+<div id="legend">
+    <div><span class="dot" style="background:#4488ff"></span>z ~ 1  (nearby)</div>
+    <div><span class="dot" style="background:#aa44ff"></span>z ~ 2</div>
+    <div><span class="dot" style="background:#ff4488"></span>z ~ 3</div>
+    <div><span class="dot" style="background:#ffaa22"></span>z ~ 4  (distant)</div>
+</div>
+
+<!-- ── Three.js CDN (importmap yox, sadə script tag) ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// ── Sahə qurulumu ───────────────────────────────────────────
+const scene    = new THREE.Scene();
+const camera   = new THREE.PerspectiveCamera(
+    60, window.innerWidth/window.innerHeight, 0.1, 200000
+);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping  = true;
+controls.dampingFactor  = 0.05;
+controls.enableZoom     = true;
+
+// ── Gaussian texture (yumşaq nöqtə effekti) ────────────────
+function makeGlow(size=64) {
+    const c   = document.createElement('canvas');
+    c.width   = c.height = size;
+    const ctx = c.getContext('2d');
+    const g   = ctx.createRadialGradient(
+        size/2, size/2, 0,
+        size/2, size/2, size/2
+    );
+    g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+    g.addColorStop(0.3, 'rgba(255,255,255,0.7)');
+    g.addColorStop(0.7, 'rgba(255,255,255,0.2)');
+    g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,size,size);
+    return new THREE.CanvasTexture(c);
+}
+const glowTex = makeGlow(64);
+
+// ── Redshiftdən rəng hesabla (plasma-like) ─────────────────
+function zToColor(z_abs, strength) {
+    const t = Math.min(Math.max(z_abs / 4.5, 0), 1);
+
+    // z=0→1: blue, z=1→2: purple, z=2→3: red, z=3→4.5: orange-yellow
+    let r, g, b;
+    if (t < 0.25) {
+        const s = t / 0.25;
+        r = 0.1 + s * 0.4;   // 0.1→0.5
+        g = 0.2 + s * 0.0;
+        b = 0.9 - s * 0.2;   // 0.9→0.7
+    } else if (t < 0.50) {
+        const s = (t - 0.25) / 0.25;
+        r = 0.5 + s * 0.3;   // 0.5→0.8
+        g = 0.0;
+        b = 0.7 - s * 0.5;   // 0.7→0.2
+    } else if (t < 0.75) {
+        const s = (t - 0.50) / 0.25;
+        r = 0.8 + s * 0.2;   // 0.8→1.0
+        g = 0.0 + s * 0.3;
+        b = 0.2 - s * 0.2;   // 0.2→0.0
+    } else {
+        const s = (t - 0.75) / 0.25;
+        r = 1.0;
+        g = 0.3 + s * 0.4;   // 0.3→0.7
+        b = 0.0;
+    }
+
+    // Strength ilə parlaqlıq artır
+    const boost = 0.7 + strength * 0.3;
+    return [
+        Math.min(r * boost, 1),
+        Math.min(g * boost, 1),
+        Math.min(b * boost, 1)
+    ];
+}
+
+// ── JSON yüklə ─────────────────────────────────────────────
+fetch('civ_nebula.json')
+    .then(r => {
+        if (!r.ok) throw new Error('civ_nebula.json tapılmadı!');
+        return r.json();
+    })
+    .then(data => {
+        console.log('Absorbers yükləndi:', data.length);
+        document.getElementById('count').textContent =
+            data.length.toLocaleString() + ' C IV absorbers';
+
+        const n   = data.length;
+        const pos = new Float32Array(n * 3);
+        const col = new Float32Array(n * 3);
+
+        for (let i = 0; i < n; i++) {
+            const p = data[i];
+
+            // Koordinatlar — Mpc cinsindən
+            pos[i*3    ] = p.x;
+            pos[i*3 + 1] = p.y;
+            pos[i*3 + 2] = p.z;
+
+            // Rəng
+            const [r, g, b] = zToColor(p.z_abs, p.strength || 0.5);
+            col[i*3    ] = r;
+            col[i*3 + 1] = g;
+            col[i*3 + 2] = b;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position',
+            new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('color',
+            new THREE.BufferAttribute(col, 3));
+
+        // ── Material ───────────────────────────────────────
+        const mat = new THREE.PointsMaterial({
+            size:            2.5,            // piksel (sizeAttenuation=false)
+            sizeAttenuation: false,          // ← ÖNƏMLİ: piksel ölçüsü
+            vertexColors:    true,
+            transparent:     true,
+            opacity:         0.85,
+            map:             glowTex,
+            depthWrite:      false,
+            blending:        THREE.AdditiveBlending,  // dumanlıq effekti
+            alphaTest:       0.01,
+        });
+
+        const points = new THREE.Points(geo, mat);
+        scene.add(points);
+
+        // ── Kameranı mərkəzə fokuslat ──────────────────────
+        geo.computeBoundingSphere();
+        const center = geo.boundingSphere.center;
+        const rad    = geo.boundingSphere.radius;
+
+        controls.target.copy(center);
+        camera.position.set(
+            center.x,
+            center.y,
+            center.z + rad * 2.2
+        );
+        camera.far = rad * 15;
+        camera.updateProjectionMatrix();
+        controls.update();
+
+        console.log('BoundingSphere:', {
+            center: center, radius: rad
+        });
+    })
+    .catch(err => {
+        console.error('XƏTA:', err);
+        document.getElementById('count').textContent =
+            '⚠ ' + err.message;
+    });
+
+// ── Animasiya ──────────────────────────────────────────────
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
