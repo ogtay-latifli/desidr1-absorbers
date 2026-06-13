@@ -4,205 +4,383 @@
     <meta charset="utf-8">
     <title>DESI DR1. C IV Absorbers</title>
     <style>
-        * { margin: 0; padding: 0; }
-        body { overflow: hidden; background: #000; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { overflow:hidden; background:#000;
+               font-family:'Courier New', monospace; }
+
         #info {
-            position: absolute; top: 12px; left: 12px;
-            color: rgba(255,255,255,0.7);
-            font-family: monospace; font-size: 13px;
-            line-height: 1.8; pointer-events: none;
+            position:absolute; top:14px; left:14px;
+            color:rgba(255,255,255,0.8);
+            font-size:13px; line-height:1.9; pointer-events:none;
         }
-        #legend {
-            position: absolute; bottom: 16px; right: 16px;
-            color: white; font-family: monospace; font-size: 11px;
-            line-height: 1.9;
+        #info .title {
+            font-size:16px; font-weight:bold;
+            color:#ff88cc; letter-spacing:2px;
         }
-        .dot { display:inline-block; width:8px; height:8px;
-               border-radius:50%; margin-right:6px; }
+        #info .subtitle { color:#cc66aa; margin-bottom:2px; }
+        #info .hint { font-size:10px; color:#444; }
+
+        /* ── Elmi panel ── */
+        #sci {
+            position:absolute; top:14px; right:14px; width:270px;
+            background:rgba(0,0,0,0.65);
+            border:1px solid rgba(255,255,255,0.12);
+            border-radius:10px; padding:14px;
+            font-size:11px; line-height:1.7;
+            color:rgba(255,255,255,0.65);
+        }
+        #sci h3 {
+            font-size:11px; letter-spacing:1px;
+            margin-bottom:6px; margin-top:10px;
+        }
+        #sci h3:first-child { margin-top:0; }
+        #sci p { margin-bottom:6px; }
+
+        /* ── Düymələr ── */
+        #btns {
+            position:absolute; bottom:54px; left:14px;
+            display:flex; gap:8px; flex-wrap:wrap;
+        }
+        button {
+            background:rgba(255,255,255,0.07);
+            border:1px solid rgba(255,255,255,0.18);
+            color:rgba(255,255,255,0.75);
+            padding:6px 14px; border-radius:16px;
+            font-size:11px; cursor:pointer;
+            font-family:monospace; transition:all 0.2s;
+        }
+        button:hover  { background:rgba(255,255,255,0.15); }
+        button.active {
+            background:rgba(120,80,220,0.35);
+            border-color:#8866ff; color:#ccaaff;
+        }
+
+        /* ── Colorbar ── */
+        #cbar-wrap {
+            position:absolute; bottom:14px; left:14px;
+            pointer-events:none;
+        }
+        #cbar-wrap canvas { display:block; }
+
+        /* ── z panel ── */
+        #zpanel {
+            position:absolute; bottom:14px; right:14px;
+            color:rgba(255,255,255,0.5);
+            font-size:10px; line-height:2.0;
+            text-align:right; pointer-events:none;
+        }
     </style>
 </head>
 <body>
 
+<!-- Sol yuxarı: başlıq -->
 <div id="info">
-    DESI DR1. C IV Absorbers<br>
+    <div class="title">DESI DR1</div>
+    <div class="subtitle">C IV Absorber Map</div>
     <span id="count" style="color:#aaa">Loading...</span><br>
-    <span style="font-size:11px;color:#888">
-        Drag to rotate · Scroll to zoom
-    </span>
+    <span class="hint">Drag · Scroll · Dbl-click = reset</span>
 </div>
 
-<div id="legend">
-    <div><span class="dot" style="background:#4488ff"></span>z ~ 1  (nearby)</div>
-    <div><span class="dot" style="background:#aa44ff"></span>z ~ 2</div>
-    <div><span class="dot" style="background:#ff4488"></span>z ~ 3</div>
-    <div><span class="dot" style="background:#ffaa22"></span>z ~ 4  (distant)</div>
+<!-- Sağ yuxarı: elm -->
+<div id="sci">
+    <h3 style="color:#ff88cc">⚛  C IV ABSORBER NƏDİR?</h3>
+    <p>
+        Karbon C<sup>4+</sup> ionları uzaq <b style="color:#ffcc44">kvazarların</b>
+        işığını λ = 1548 Å-da udan qaz buludlarıdır. Hər nöqtə milyardlarla
+        işıl ili uzaqdakı bir qaz buludunu təmsil edir.
+    </p>
+
+    <h3 style="color:#ffaa44">◯  NİYƏ ORTASI BOŞDUR?</h3>
+    <p>
+        <b style="color:#ffaa44">Minimum məsafə:</b> C IV xətti DESI-nin optik
+        diapazonuna yalnız z &gt; 1.4-dən düşür → ~4000 Mpc-dən yaxında absorber
+        aşkar edilmir. Biz (Yer) <b>mərkəzdəyik</b>.
+    </p>
+    <p>
+        <b style="color:#ff6688">Süd yolu boşluğu:</b> DESI Galaktik müstəvidə
+        müşahidə etmir (Zone of Avoidance) → qaranlıq kəmər.
+    </p>
+    <p>
+        <b style="color:#88aaff">Kəpənək forması:</b> DESI-nin öz göy sahəsi
+        (survey footprint) — Cənub + Şimal qalpaqları.
+    </p>
+
+    <h3 style="color:#aaddff">🎨  RƏNG = MƏSAFƏ</h3>
+    <p>
+        Mavi → Bənövşəyi → Qırmızı → Narıncı<br>
+        (z = 1.5 → 2 → 3 → 4.5)
+    </p>
 </div>
 
-<!-- ── Three.js CDN (importmap yox, sadə script tag) ── -->
+<!-- Düymələr -->
+<div id="btns">
+    <button id="btn-rot"   class="active">⟳ Rotate</button>
+    <button id="btn-shell" class="active">◎ z-Shells</button>
+    <button id="btn-axes"  class="active">⊕ Axes</button>
+    <button id="btn-reset">↺ Reset</button>
+</div>
+
+<!-- Colorbar -->
+<div id="cbar-wrap">
+    <canvas id="cbar" width="260" height="42"></canvas>
+</div>
+
+<!-- z qatları cədvəli -->
+<div id="zpanel">
+    <div style="color:#6688aa">— z = 1.5 — 4213 Mpc</div>
+    <div style="color:#6677bb">— z = 2.0 — 5179 Mpc</div>
+    <div style="color:#8855cc">— z = 2.5 — 5848 Mpc</div>
+    <div style="color:#aa4488">— z = 3.0 — 6332 Mpc</div>
+    <div style="color:#cc6633">— z = 3.5 — 6713 Mpc</div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
-// ── Sahə qurulumu ───────────────────────────────────────────
+// ── Renderer ─────────────────────────────────────────────────
 const scene    = new THREE.Scene();
 const camera   = new THREE.PerspectiveCamera(
-    60, window.innerWidth/window.innerHeight, 0.1, 200000
+    60, innerWidth/innerHeight, 1, 500000
 );
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping  = true;
-controls.dampingFactor  = 0.05;
-controls.enableZoom     = true;
+controls.enableDamping   = true;
+controls.dampingFactor   = 0.05;
+controls.autoRotate      = true;
+controls.autoRotateSpeed = 0.35;
 
-// ── Gaussian texture (yumşaq nöqtə effekti) ────────────────
-function makeGlow(size=64) {
-    const c   = document.createElement('canvas');
-    c.width   = c.height = size;
+// ── Glow texture ─────────────────────────────────────────────
+const glowTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
     const ctx = c.getContext('2d');
-    const g   = ctx.createRadialGradient(
-        size/2, size/2, 0,
-        size/2, size/2, size/2
-    );
-    g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-    g.addColorStop(0.3, 'rgba(255,255,255,0.7)');
-    g.addColorStop(0.7, 'rgba(255,255,255,0.2)');
-    g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    const g   = ctx.createRadialGradient(32,32,0,32,32,32);
+    g.addColorStop(0.0,'rgba(255,255,255,1.0)');
+    g.addColorStop(0.3,'rgba(255,255,255,0.7)');
+    g.addColorStop(0.7,'rgba(255,255,255,0.2)');
+    g.addColorStop(1.0,'rgba(255,255,255,0.0)');
     ctx.fillStyle = g;
-    ctx.fillRect(0,0,size,size);
+    ctx.fillRect(0,0,64,64);
     return new THREE.CanvasTexture(c);
+})();
+
+// ── z → RGB ──────────────────────────────────────────────────
+function zToRGB(z, str) {
+    const t = Math.min(Math.max(z/4.5,0),1);
+    let r,g,b;
+    if      (t<.25){const s=t/.25;   r=.1+s*.4;g=.1;    b=.9-s*.2;}
+    else if (t<.50){const s=(t-.25)/.25;r=.5+s*.3;g=0;  b=.7-s*.5;}
+    else if (t<.75){const s=(t-.50)/.25;r=.8+s*.2;g=s*.3;b=.2-s*.2;}
+    else           {const s=(t-.75)/.25;r=1;g=.3+s*.4;  b=0;}
+    const k=0.7+(str||.5)*.3;
+    return [Math.min(r*k,1),Math.min(g*k,1),Math.min(b*k,1)];
 }
-const glowTex = makeGlow(64);
 
-// ── Redshiftdən rəng hesabla (plasma-like) ─────────────────
-function zToColor(z_abs, strength) {
-    const t = Math.min(Math.max(z_abs / 4.5, 0), 1);
+// ── Sprite label ─────────────────────────────────────────────
+function makeLabel(text, color='white', size=22) {
+    const c = document.createElement('canvas');
+    c.width=300; c.height=60;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.font = `bold ${size}px monospace`;
+    ctx.fillText(text, 10, 44);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(c),
+        transparent:true, opacity:.8, depthWrite:false
+    }));
+    return sp;
+}
 
-    // z=0→1: blue, z=1→2: purple, z=2→3: red, z=3→4.5: orange-yellow
-    let r, g, b;
-    if (t < 0.25) {
-        const s = t / 0.25;
-        r = 0.1 + s * 0.4;   // 0.1→0.5
-        g = 0.2 + s * 0.0;
-        b = 0.9 - s * 0.2;   // 0.9→0.7
-    } else if (t < 0.50) {
-        const s = (t - 0.25) / 0.25;
-        r = 0.5 + s * 0.3;   // 0.5→0.8
-        g = 0.0;
-        b = 0.7 - s * 0.5;   // 0.7→0.2
-    } else if (t < 0.75) {
-        const s = (t - 0.50) / 0.25;
-        r = 0.8 + s * 0.2;   // 0.8→1.0
-        g = 0.0 + s * 0.3;
-        b = 0.2 - s * 0.2;   // 0.2→0.0
-    } else {
-        const s = (t - 0.75) / 0.25;
-        r = 1.0;
-        g = 0.3 + s * 0.4;   // 0.3→0.7
-        b = 0.0;
-    }
+// ── State ────────────────────────────────────────────────────
+let shellObjs = [], axisObjs = [];
+let DR = 1; // data radius
 
-    // Strength ilə parlaqlıq artır
-    const boost = 0.7 + strength * 0.3;
-    return [
-        Math.min(r * boost, 1),
-        Math.min(g * boost, 1),
-        Math.min(b * boost, 1)
+// ── z-Shells ─────────────────────────────────────────────────
+const SHELLS = [
+    {z:1.5, d:4213, col:0x224466},
+    {z:2.0, d:5179, col:0x334488},
+    {z:2.5, d:5848, col:0x553388},
+    {z:3.0, d:6332, col:0x772244},
+    {z:3.5, d:6713, col:0x884422},
+];
+
+function buildShells() {
+    SHELLS.forEach(({z,d,col}) => {
+        const geo  = new THREE.SphereGeometry(d, 48, 24);
+        const mat  = new THREE.MeshBasicMaterial({
+            color:col, wireframe:true,
+            transparent:true, opacity:0.07
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        scene.add(mesh);
+        shellObjs.push(mesh);
+
+        const lbl = makeLabel(`z = ${z.toFixed(1)}`, '#6688bb', 20);
+        lbl.position.set(0, d*1.02, 0);
+        lbl.scale.set(800,200,1);
+        scene.add(lbl);
+        shellObjs.push(lbl);
+    });
+}
+
+// ── Coordinate Axes ──────────────────────────────────────────
+function buildAxes(len) {
+    const defs = [
+        {dir:[1,0,0], col:0xff4444, hex:'#ff4444', lbl:'X  (RA = 0°)'},
+        {dir:[0,1,0], col:0x44ff44, hex:'#44ff44', lbl:'Y  (RA = 90°)'},
+        {dir:[0,0,1], col:0x4488ff, hex:'#4488ff', lbl:'Z  (North Pole)'},
     ];
+    defs.forEach(({dir,col,hex,lbl}) => {
+        const arr = new THREE.ArrowHelper(
+            new THREE.Vector3(...dir),
+            new THREE.Vector3(0,0,0),
+            len, col,
+            len*.06, len*.035
+        );
+        scene.add(arr);
+        axisObjs.push(arr);
+
+        const sp = makeLabel(lbl, hex, 20);
+        sp.position.set(dir[0]*(len+600), dir[1]*(len+600), dir[2]*(len+600));
+        sp.scale.set(1200,240,1);
+        scene.add(sp);
+        axisObjs.push(sp);
+    });
+
+    // Earth — Yer kürəsi (mərkəz)
+    const eg = new THREE.SphereGeometry(180,16,8);
+    const em = new THREE.MeshBasicMaterial({color:0xffffff});
+    const es = new THREE.Mesh(eg,em);
+    scene.add(es); axisObjs.push(es);
+
+    // Earth glow halo
+    const hg = new THREE.SphereGeometry(350,16,8);
+    const hm = new THREE.MeshBasicMaterial({
+        color:0x88ccff, transparent:true,
+        opacity:.12, depthWrite:false
+    });
+    scene.add(new THREE.Mesh(hg,hm));
+
+    const el = makeLabel('⊕  Earth', 'white', 20);
+    el.position.set(0,450,0);
+    el.scale.set(800,200,1);
+    scene.add(el); axisObjs.push(el);
 }
 
-// ── JSON yüklə ─────────────────────────────────────────────
+// ── Colorbar ─────────────────────────────────────────────────
+function drawCbar() {
+    const cv  = document.getElementById('cbar');
+    const ctx = cv.getContext('2d');
+    const W=cv.width, H=cv.height;
+    ctx.clearRect(0,0,W,H);
+
+    const gr = ctx.createLinearGradient(0,0,W*.72,0);
+    gr.addColorStop(0,   '#1144ff');
+    gr.addColorStop(.33, '#aa22ff');
+    gr.addColorStop(.66, '#ff2244');
+    gr.addColorStop(1,   '#ffaa22');
+    ctx.fillStyle=gr;
+    ctx.fillRect(0, 8, W*.72, H-20);
+
+    ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.font='10px monospace';
+    ctx.fillText('z=1.5', 0,      H-2);
+    ctx.fillText('z=3',   W*.36-8, H-2);
+    ctx.fillText('z=4.5', W*.72-8, H-2);
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillText('Redshift →', W*.76, H*.6);
+}
+
+// ── Load data ─────────────────────────────────────────────────
 fetch('civ_nebula.json')
-    .then(r => {
-        if (!r.ok) throw new Error('civ_nebula.json tapılmadı!');
-        return r.json();
-    })
+    .then(r=>r.json())
     .then(data => {
-        console.log('Absorbers yükləndi:', data.length);
         document.getElementById('count').textContent =
             data.length.toLocaleString() + ' C IV absorbers';
 
         const n   = data.length;
-        const pos = new Float32Array(n * 3);
-        const col = new Float32Array(n * 3);
+        const pos = new Float32Array(n*3);
+        const col = new Float32Array(n*3);
 
-        for (let i = 0; i < n; i++) {
-            const p = data[i];
-
-            // Koordinatlar — Mpc cinsindən
-            pos[i*3    ] = p.x;
-            pos[i*3 + 1] = p.y;
-            pos[i*3 + 2] = p.z;
-
-            // Rəng
-            const [r, g, b] = zToColor(p.z_abs, p.strength || 0.5);
-            col[i*3    ] = r;
-            col[i*3 + 1] = g;
-            col[i*3 + 2] = b;
+        for(let i=0;i<n;i++){
+            const p=data[i];
+            pos[i*3]  =p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z;
+            const[r,g,b]=zToRGB(p.z_abs,p.strength);
+            col[i*3]=r; col[i*3+1]=g; col[i*3+2]=b;
         }
 
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position',
-            new THREE.BufferAttribute(pos, 3));
-        geo.setAttribute('color',
-            new THREE.BufferAttribute(col, 3));
+        const geo=new THREE.BufferGeometry();
+        geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+        geo.setAttribute('color',   new THREE.BufferAttribute(col,3));
 
-        // ── Material ───────────────────────────────────────
-        const mat = new THREE.PointsMaterial({
-            size:            2.5,            // piksel (sizeAttenuation=false)
-            sizeAttenuation: false,          // ← ÖNƏMLİ: piksel ölçüsü
-            vertexColors:    true,
-            transparent:     true,
-            opacity:         0.85,
-            map:             glowTex,
-            depthWrite:      false,
-            blending:        THREE.AdditiveBlending,  // dumanlıq effekti
-            alphaTest:       0.01,
+        const mat=new THREE.PointsMaterial({
+            size:2.5, sizeAttenuation:false,
+            vertexColors:true, transparent:true, opacity:.85,
+            map:glowTex, depthWrite:false,
+            blending:THREE.AdditiveBlending, alphaTest:.01
         });
+        scene.add(new THREE.Points(geo,mat));
 
-        const points = new THREE.Points(geo, mat);
-        scene.add(points);
-
-        // ── Kameranı mərkəzə fokuslat ──────────────────────
         geo.computeBoundingSphere();
-        const center = geo.boundingSphere.center;
-        const rad    = geo.boundingSphere.radius;
+        DR = geo.boundingSphere.radius;
 
-        controls.target.copy(center);
-        camera.position.set(
-            center.x,
-            center.y,
-            center.z + rad * 2.2
-        );
-        camera.far = rad * 15;
+        // Kamera: Yerdən (0,0,0) bütün strukturu görmək üçün
+        controls.target.set(0,0,0);
+        camera.position.set(DR*.8, DR*.5, DR*1.8);
+        camera.far = DR*20;
         camera.updateProjectionMatrix();
         controls.update();
 
-        console.log('BoundingSphere:', {
-            center: center, radius: rad
-        });
+        buildShells();
+        buildAxes(DR*.55);
+        drawCbar();
     })
-    .catch(err => {
-        console.error('XƏTA:', err);
-        document.getElementById('count').textContent =
-            '⚠ ' + err.message;
+    .catch(e=>{
+        document.getElementById('count').textContent='⚠ '+e.message;
     });
 
-// ── Animasiya ──────────────────────────────────────────────
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-}
-animate();
+// ── Buttons ──────────────────────────────────────────────────
+const B = id => document.getElementById(id);
 
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+B('btn-rot').onclick = function(){
+    controls.autoRotate = !controls.autoRotate;
+    this.classList.toggle('active', controls.autoRotate);
+};
+B('btn-shell').onclick = function(){
+    const v=shellObjs[0]?.visible ?? true;
+    shellObjs.forEach(o=>o.visible=!v);
+    this.classList.toggle('active',!v);
+};
+B('btn-axes').onclick = function(){
+    const v=axisObjs[0]?.visible ?? true;
+    axisObjs.forEach(o=>o.visible=!v);
+    this.classList.toggle('active',!v);
+};
+B('btn-reset').onclick = ()=>{
+    controls.target.set(0,0,0);
+    camera.position.set(DR*.8, DR*.5, DR*1.8);
+    controls.update();
+};
+renderer.domElement.addEventListener('dblclick',
+    ()=>B('btn-reset').click()
+);
+
+// ── Animate ──────────────────────────────────────────────────
+(function loop(){
+    requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene,camera);
+})();
+
+window.addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(innerWidth,innerHeight);
 });
 </script>
 </body>
